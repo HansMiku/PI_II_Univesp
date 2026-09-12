@@ -1,0 +1,27 @@
+# Credenciais e variáveis locais
+.env
+.env.*
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# JavaScript / Node
+node_modules/
+dist/
+build/
+
+# Logs e temporários
+*.log
+*.tmp
+
+# Sistema operacional / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
