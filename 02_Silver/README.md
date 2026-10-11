@@ -4,31 +4,22 @@ Responsável: Rafael
 
 Esta pasta contém os códigos de limpeza, padronização e transformação dos dados provenientes da camada Bronze.
 
+## Notebook
+
+- **Silver Layer Transformations** — lê os dados CSV da camada Bronze (volumes `workspace.pi_ii_bronze`), aplica padronização e tipos, e grava 13 tabelas no schema `workspace.pi_ii_silver`.
+
 ## Entrada
-- Dados da camada Bronze
+- Dados CSV da camada Bronze (`/Volumes/workspace/pi_ii_bronze/camara` e `/Volumes/workspace/pi_ii_bronze/senado`)
 
 ## Saída
-- Dados tratados e padronizados na camada Silver
+- 13 tabelas tratadas e padronizadas no schema `workspace.pi_ii_silver`:
+
+| Origem | Tabelas Silver |
+|--------|----------------|
+| Câmara | `deputados`, `proposicoes`, `proposicoes_autores`, `votacoes_camara`, `votos_camara`, `despesas_camara` |
+| Senado | `senadores`, `senadores_exercicios`, `materias`, `materias_autorias`, `votacoes_senado`, `votos_senado`, `despesas_senado` |
+
+Todas as tabelas incluem as colunas de partição `uf_particao` e `ano_particao` para rastreabilidade.
 
 ## Observação
 Alterações podem ocorrer ao longo do projeto. Atualizar o readme conforme necessário.
-
-# Sugestões para a camada Silver
-
-A camada Silver deve preparar e padronizar os dados coletados na Bronze para uso nas etapas seguintes.
-
-Principais pontos sugeridos:
-
-- padronizar os dados da Câmara e do Senado;
-- definir identificadores consistentes para os parlamentares;
-- padronizar Casa legislativa, UF, partido e legislatura;
-- normalizar datas e tipos numéricos;
-- padronizar os valores de voto;
-- padronizar categorias de despesas;
-- consolidar proposições/matérias e autorias;
-- tratar registros duplicados e valores ausentes;
-- preservar períodos de exercício dos parlamentares;
-- manter rastreabilidade até os dados da Bronze;
-- adicionar a legislatura como dimensão explícita.
-
-A Silver deve concentrar os dados tratados e consistentes. Os cálculos dos indicadores devem ser realizados na camada Gold.

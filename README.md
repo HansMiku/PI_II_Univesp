@@ -29,7 +29,7 @@ A partir da camada Gold, o desenvolvimento se divide em frentes complementares:
 
 - `01_Bronze/` — coleta e ingestão dos dados
 - `02_Silver/` — limpeza, padronização e transformação
-- `03_Gold/` — modelagem, consultas SQL e estruturas consolidadas
+- `03_Gold/` — modelagem relacional (26 tabelas), consultas SQL e estruturas consolidadas
 - `04_Analytics/` — indicadores e análises de dados
 - `05_Aplicacao/`
   - `backend/` — API e lógica da aplicação

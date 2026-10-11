@@ -4,89 +4,34 @@ Responsável: Bruce
 
 Esta pasta contém os códigos relacionados à modelagem e organização dos dados consolidados utilizados pelo projeto.
 
-A camada Gold será estruturada para facilitar consultas, análises, indicadores e consumo pela aplicação.
+A camada Gold implementa o modelo relacional LegisAnalytica v5, com 26 tabelas normalizadas no schema `workspace.pi_ii_gold`, alimentadas a partir das 13 tabelas da camada Silver (`workspace.pi_ii_silver`).
+
+## Notebook
+
+- **LegisAnalytica - Gold Layer DDL** — cria as 26 tabelas Gold via `CREATE OR REPLACE TABLE` a partir das tabelas Silver, com verificação de contagem de linhas ao final.
 
 ## Entrada
-- Dados tratados da camada Silver
+- Dados tratados da camada Silver (`workspace.pi_ii_silver`)
+- Modelo relacional de referência: `Modelagem_Relacional_LegisAnalytica.pdf`
 
 ## Saída
-- Tabelas, dimensões, fatos e views da camada Gold
+- 26 tabelas relacionais no schema `workspace.pi_ii_gold`, organizadas em quatro grupos:
+
+| Grupo | Tabelas |
+|-------|---------|
+| Catálogos | CASA, UF, LEGISLATURA, PARTIDO, LOTE, CAUSA_AFASTAMENTO |
+| Identidade & Exercício | PARLAMENTAR, IDENTIFICADOR_PARLAMENTAR, CADASTRO_OBSERVADO, PARLAMENTAR_LEGISLATURA, MANDATO, VINCULO_MANDATO, EXERCICIO |
+| Atividade Legislativa | TIPO_PROPOSICAO, PROPOSICAO, AUTORIA, STATUS_ATUAL, VOTACAO, VOTACAO_PROPOSICAO, TIPO_VOTO, VOTO, TOTAL_PUBLICADO |
+| Despesas | TIPO_DESPESA, FORNECEDOR, DESPESA, VALOR_DESPESA |
+
+## Convenções de modelagem
+
+- IDs são `STRING` (domínio do projeto)
+- `casa` ∈ {CAMARA, SENADO}
+- Zero em numero/ano → convertido em `NULL` via `NULLIF`
+- `id_lote` = nome da tabela Silver de origem (chave para a tabela LOTE de proveniência)
+- Booleans: Câmara `aprovacao = 1 → TRUE`; Senado `resultado LIKE '%aprovad%' → TRUE`
+- Filtro `registro_valido_leg57 = true` aplicado nas tabelas do Senado quando aplicável
 
 ## Observação
 Alterações podem ocorrer ao longo do projeto. Atualizar o readme conforme necessário.
-
-# Sugestões de indicadores para a camada Gold
-
-A camada Gold deve utilizar os dados tratados na Silver para calcular indicadores e agregações que serão consumidos pela etapa de Analytics.
-
-## Atividade parlamentar
-
-- número de proposições apresentadas;
-- proposições por tipo;
-- proposições por período;
-- taxa de participação em votações;
-- número de votações participadas;
-- ausências em votações.
-
-## Comportamento em votações
-
-- percentual de votos "Sim";
-- percentual de votos "Não";
-- percentual de abstenções;
-- distribuição dos votos por partido;
-- comparação do voto individual com a orientação/comportamento do partido;
-- grau de alinhamento partidário.
-
-## Produção legislativa
-
-- total de proposições;
-- proposições por parlamentar;
-- proposições por partido;
-- proposições por UF;
-- evolução temporal da produção;
-- situação das proposições;
-- taxa de aprovação ou avanço das proposições, caso os dados permitam uma definição consistente.
-
-## Despesas
-
-- despesa total por parlamentar;
-- despesa média;
-- despesa por categoria;
-- percentual de cada categoria no gasto total;
-- evolução mensal;
-- comparação entre parlamentares;
-- comparação entre partidos;
-- comparação entre UFs;
-- distribuição e identificação de valores muito acima ou abaixo da média.
-
-## Representação política
-
-- número de parlamentares por partido;
-- número de parlamentares por UF;
-- participação percentual de cada partido na Casa;
-- distribuição dos partidos por UF;
-- comparação entre Câmara e Senado.
-
-## Indicadores estatísticos
-
-- média;
-- mediana;
-- mínimo e máximo;
-- desvio-padrão;
-- percentis;
-- variação temporal;
-- proporções;
-- rankings descritivos;
-- correlações entre variáveis, quando fizer sentido.
-
-## Observações
-
-Alguns indicadores exigem definição metodológica antes da implementação, principalmente:
-
-- taxa de participação em votações;
-- ausências em votações;
-- orientação partidária;
-- grau de alinhamento partidário;
-- taxa de aprovação ou avanço das proposições.
-
-Esses indicadores só devem ser calculados quando os dados disponíveis permitirem uma regra consistente e documentada.

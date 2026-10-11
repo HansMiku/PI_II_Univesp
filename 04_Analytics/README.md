@@ -78,3 +78,35 @@ A etapa pode produzir:
 As visualizações finais da aplicação devem ser implementadas no frontend, utilizando os dados disponibilizados pelo backend.
 
 Os cálculos principais e as regras dos indicadores devem permanecer na camada Gold, evitando duplicação da lógica de negócio.
+
+---
+
+## Notas da camada Gold (atualizado em out/2026)
+
+A camada Gold está implementada no schema `workspace.pi_ii_gold` com 26 tabelas normalizadas. As consultas de Analytics devem partir dessas tabelas.
+
+### Tabelas principais para indicadores
+
+| Indicador | Tabelas Gold relevantes |
+|-----------|-------------------------|
+| Atividade parlamentar | `proposicao`, `autoria`, `votacao`, `voto`, `votacao_proposicao` |
+| Produção legislativa | `proposicao`, `tipo_proposicao`, `autoria`, `total_publicado`, `status_atual` |
+| Comportamento em votações | `voto`, `tipo_voto`, `votacao`, `parlamentar`, `partido` |
+| Despesas | `despesa`, `valor_despesa`, `tipo_despesa`, `fornecedor`, `parlamentar` |
+| Representação política | `parlamentar`, `partido`, `uf`, `casa`, `cadastro_observado` |
+
+### Tabelas com maior volume de dados
+
+- `voto`: ~506 mil registros (votos individuais)
+- `despesa` / `valor_despesa`: ~780 mil registros cada
+- `autoria`: ~456 mil registros
+- `proposicao`: ~264 mil registros
+
+### Convenções importantes para consultas
+
+- Todos os IDs são `STRING` (não usar como INT)
+- `casa` ∈ {`'CAMARA'`, `'SENADO'`}
+- `id_lote` identifica a tabela Silver de origem (proveniência)
+- Chaves primárias costumam ser compostas (ex: `casa + id_parlamentar`, `casa + id_proposicao`)
+- Para cruzar votações com proposições, usar a tabela `votacao_proposicao` como bridge
+- Para valores de despesa, `despesa` traz o cabeçalho e `valor_despesa` traz os valores monetários (documento, glosa, líquido)
