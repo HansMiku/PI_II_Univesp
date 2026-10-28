@@ -33,5 +33,22 @@ A camada Gold implementa o modelo relacional LegisAnalytica v5, com 26 tabelas n
 - Booleans: Câmara `aprovacao = 1 → TRUE`; Senado `resultado LIKE '%aprovad%' → TRUE`
 - Filtro `registro_valido_leg57 = true` aplicado nas tabelas do Senado quando aplicável
 
+## Correções de integridade (27/10/2026)
+
+3 correções pontuais aplicadas no notebook Gold DDL:
+
+1. **`proposicao` (SENADO)**: adicionado `SELECT DISTINCT` para eliminar 2.060 chaves PK duplicadas — a Silver `materias` tem uma linha por matéria+autor (`dropDuplicates(["id_materia","id_senador"])`), e o Gold seleciona apenas colunas da matéria.
+2. **`votacao_proposicao`**: adicionado `INNER JOIN` com a Gold `proposicao` para remover 980 registros órfãos (491 `id_proposicao=0` na Câmara + 73 proposições ausentes + 416 matérias inexistentes/fora da 57ª legislatura no Senado).
+3. **`total_publicado` (SENADO)**: trocado `COUNT(*)` por `COUNT(DISTINCT id_materia)` para refletir proposições únicas.
+
+**Impacto:** `proposicao` 264.078→248.560; `votacao_proposicao` 2.020→1.040; `total_publicado` SENADO 29.193→13.675.
+
+## Limitações conhecidas (para PostgreSQL/Supabase)
+
+- `despesa.codigo_tipo`: 329 registros do Senado com `NULL` (API do Senado não envia o tipo). FK `despesa→tipo_despesa` deve ser **nullable**.
+- `despesa.id_parlamentar` (Câmara): é código **CEAP**, não FK direta para `parlamentar`. Mapeamento via `identificador_parlamentar` (`sistema='CEAP'`). 216 CEAPs sem correspondência → `id_parlamentar=NULL`.
+- Todas as colunas são `nullable` no schema Gold (sem constraints PK/FK a nível DB). Constraints serão criadas no PostgreSQL.
+- `votacao_proposicao` (SENADO): apenas 7 registros (votações que referenciam matérias válidas da 57ª legislatura).
+
 ## Observação
 Alterações podem ocorrer ao longo do projeto. Atualizar o readme conforme necessário.
