@@ -50,5 +50,21 @@ A camada Gold implementa o modelo relacional LegisAnalytica v5, com 26 tabelas n
 - Todas as colunas são `nullable` no schema Gold (sem constraints PK/FK a nível DB). Constraints serão criadas no PostgreSQL.
 - `votacao_proposicao` (SENADO): apenas 7 registros (votações que referenciam matérias válidas da 57ª legislatura).
 
+## Migração para Supabase (PostgreSQL)
+
+A camada Gold pode ser exportada para o PostgreSQL do Supabase para consumo pela aplicação web.
+
+| Diretório | Arquivo | Descrição |
+|-----------|--------|------------|
+| `export/` | `EXPORT_supabase_postgresql.ipynb` | Notebook de transferência em lotes + validação |
+| `supabase/migrations/` | `001_initial_schema_supabase.sql` | Esquema PostgreSQL: 26 tabelas, 60 FKs, 30 índices, 2 UNIQUEs |
+
+**Fluxo de migração:**
+- O esquema é criado no Supabase executando `001_initial_schema_supabase.sql` diretamente no SQL Editor (aplicação manual; o script é versionado aqui como referência). O notebook de exportação também verifica a existência do schema e o aplica automaticamente caso o banco esteja vazio.
+- O notebook `EXPORT_supabase_postgresql.ipynb` opera em três modos, controlados pela variável `EXPORT_MODE`: `prepare` (padrão, sem gravação), `pilot` (apenas `public.casa`) e `full` (as 26 tabelas). O recorte de exportação é **2025 completo** (01/01/2025 a 31/12/2025), preservando entidades anteriores necessárias às FKs.
+- Antes da primeira escrita, o notebook valida as constraints da migration (NOT NULL, PKs, UNIQUE, VARCHAR) e o schema de destino; após a carga, compara contagens por tabela e executa 46 verificações de integridade referencial.
+
+**Pré-requisitos:** Secret Scope `legisanalytica_supabase` no Databricks com chaves `jdbc_url`, `user`, `password`.
+
 ## Observação
 Alterações podem ocorrer ao longo do projeto. Atualizar o readme conforme necessário.
