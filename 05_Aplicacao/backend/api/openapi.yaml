@@ -1,0 +1,709 @@
+openapi: 3.0.3
+info:
+  title: LegisAnalytica GraphQL API
+  version: 1.0.0
+  description: |
+    API GraphQL com dados de parlamentares (Câmara e Senado): cadastro, despesas,
+    atividade legislativa (proposições) e votos.
+
+    Todas as consultas passam por **um único endpoint** (`POST /graphql`). O que
+    muda é o texto GraphQL enviado no campo `query`. Esta especificação documenta
+    o endpoint, o formato de requisição/resposta, os tipos do schema e traz um
+    exemplo para cada consulta raiz disponível.
+
+    ## Comportamento do handler
+
+    - Apenas `POST` é aceito. Outros métodos retornam `405`.
+    - O corpo deve ser JSON com o campo `query`. Os campos `variables` e
+      `operationName` **são ignorados**: passe os valores direto no texto da query.
+    - A profundidade da query é limitada a **10 níveis** de `{ }`. Acima disso
+      retorna `400`.
+    - Erros de execução do GraphQL retornam **HTTP 200** com o campo `errors`
+      preenchido. Erros de validação (campo ou argumento inválido) têm a mensagem
+      detalhada; qualquer outro erro é mascarado como
+      `An internal server error occurred while processing the request`.
+    - Os valores de `casa` dependem dos dados carregados (ex.: `CAMARA`, `SENADO`).
+      Consulte a query `casas` para ver os valores válidos.
+    - Os resolvers aninhados fazem uma chamada ao serviço por item (padrão N+1).
+      Prefira `limit` baixo e peça só os campos necessários.
+
+    ## Limitações conhecidas
+
+    - Não existe filtro de parlamentares por UF. `parlamentares` aceita só
+      `limit`/`offset` e `buscaParlamentares` só `nome`. Hoje o filtro por UF
+      precisa ser feito no cliente, lendo `estado { uf }`.
+
+    ## Consultas raiz
+
+    | Consulta | Argumentos | Retorno |
+    |---|---|---|
+    | `parlamentar` | `id`!, `casa`! | `Politician` |
+    | `parlamentares` | `limit`=20, `offset`=0 | `[Politician]` |
+    | `buscaParlamentares` | `nome`!, `limit`=20, `offset`=0 | `[Politician]` |
+    | `casas` | - | `[House]` |
+    | `ufs` | - | `[State]` |
+    | `partidos` | - | `[Party]` |
+    | `legislaturas` | - | `[Legislature]` |
+    | `despesas` | `id`!, `limit`=20, `offset`=0, `type_code` | `[Expense]` |
+    | `atividade` | `id`!, `limit`=20, `offset`=0 | `[Proposition]` |
+    | `votos` | `id`!, `limit`=20, `offset`=0, `vote_code` | `[Vote]` |
+    | `todas_proposicoes` | `limit`=20, `offset`=0 | `[Proposition]` |
+    | `todos_votos` | `limit`=20, `offset`=0 | `[Vote]` |
+
+    (`!` = obrigatório.)
+
+    ## Campos aninhados
+
+    - `Politician`: `estado`, `partido`, `legislaturas`, `despesas(limit, offset, type_code)`,
+      `atividade(limit, offset)`, `votos(limit, offset, vote_code)`
+    - `Expense`: `tipo` (`ExpenseType`), `fornecedor` (`Supplier`)
+    - `Vote`: `votacao` (`Votacao`), `tipo` (`VoteType`)
+    - `Votacao`: `proposicoes` (`[Proposition]`)
+
+servers:
+  - url: http://localhost:8080
+    description: Desenvolvimento local (ajuste host e porta)
+
+tags:
+  - name: GraphQL
+    description: Endpoint único de consultas
+
+paths:
+  /graphql:
+    post:
+      tags: [GraphQL]
+      operationId: executeGraphQL
+      summary: Executa uma consulta GraphQL
+      description: |
+        Envia uma query GraphQL no campo `query`. Somente consultas (`query`) estão
+        disponíveis; o schema não define mutations nem subscriptions.
+
+        > O caminho `/graphql` é o padrão assumido. Ajuste conforme o registro
+        > de `HandleGraphQL` no seu router.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GraphQLRequest'
+            examples:
+              parlamentar:
+                summary: parlamentar - dados de um parlamentar
+                value:
+                  query: |
+                    query {
+                      parlamentar(id: "5942", casa: "SENADO") {
+                        casa
+                        id_parlamentar
+                        nome_referencia
+                        url_foto
+                        email
+                        partido { sigla }
+                        estado { uf nome }
+                        legislaturas { numero_legislatura inicio fim }
+                      }
+                    }
+              dados_referencia:
+                summary: dados de referência - casas, UFs, partidos e legislaturas em uma chamada
+                value:
+                  query: |
+                    query {
+                      casas { casa nome }
+                      ufs { uf nome }
+                      partidos { sigla }
+                      legislaturas { numero_legislatura inicio fim }
+                    }
+              parlamentar_completo:
+                summary: parlamentar - tudo em uma chamada (pesado, N+1)
+                description: |
+                  Traz cadastro, despesas, atividade e votos de uma vez. Para telas de
+                  detalhe, prefira carregar cada seção separadamente.
+                value:
+                  query: |
+                    query {
+                      parlamentar(id: "5942", casa: "SENADO") {
+                        casa
+                        id_parlamentar
+                        nome_referencia
+                        url_foto
+                        email
+                        partido { sigla }
+                        estado { uf nome }
+                        legislaturas { numero_legislatura inicio fim }
+                        despesas(limit: 10) {
+                          id_despesa
+                          ano
+                          mes
+                          valor_liquido
+                          tipo { descricao }
+                          fornecedor { nome cnpj_cpf }
+                        }
+                        atividade(limit: 10) {
+                          id_proposicao
+                          sigla_tipo
+                          numero
+                          ano
+                          ementa
+                        }
+                        votos(limit: 10) {
+                          codigo_voto
+                          tipo { descricao }
+                          votacao { data_votacao descricao aprovacao }
+                        }
+                      }
+                    }
+              votos_com_alias:
+                summary: aliases - mesma consulta duas vezes na mesma requisição
+                value:
+                  query: |
+                    query {
+                      sim: votos(id: "5942", vote_code: "Sim", limit: 10) { id_votacao codigo_voto }
+                      nao: votos(id: "5942", vote_code: "Não", limit: 10) { id_votacao codigo_voto }
+                    }
+              parlamentar_votos:
+                summary: parlamentar - votos com dados da votação e proposições
+                value:
+                  query: |
+                    query {
+                      parlamentar(id: "5942", casa: "SENADO") {
+                        nome_referencia
+                        votos(limit: 50, offset: 0) {
+                          id_votacao
+                          codigo_voto
+                          tipo { descricao }
+                          votacao {
+                            data_votacao
+                            sigla_orgao
+                            descricao
+                            aprovacao
+                            votos_sim
+                            votos_nao
+                            votos_outros
+                            proposicoes {
+                              id_proposicao
+                              sigla_tipo
+                              numero
+                              ano
+                              ementa
+                            }
+                          }
+                        }
+                      }
+                    }
+              parlamentar_despesas:
+                summary: parlamentar - despesas aninhadas
+                value:
+                  query: |
+                    query {
+                      parlamentar(id: "204554", casa: "CAMARA") {
+                        nome_referencia
+                        despesas(limit: 10, offset: 0, type_code: "1") {
+                          id_despesa
+                          ano
+                          mes
+                          valor_documento
+                          valor_glosa
+                          valor_liquido
+                          tipo { descricao }
+                          fornecedor { nome cnpj_cpf }
+                        }
+                      }
+                    }
+              parlamentar_atividade:
+                summary: parlamentar - proposições aninhadas
+                value:
+                  query: |
+                    query {
+                      parlamentar(id: "5942", casa: "SENADO") {
+                        atividade(limit: 20, offset: 0) {
+                          id_proposicao
+                          sigla_tipo
+                          numero
+                          ano
+                          ementa
+                          data_apresentacao
+                        }
+                      }
+                    }
+              parlamentares:
+                summary: parlamentares - lista paginada
+                value:
+                  query: |
+                    query {
+                      parlamentares(limit: 20, offset: 0) {
+                        casa
+                        id_parlamentar
+                        nome_referencia
+                        partido { sigla }
+                        estado { uf }
+                      }
+                    }
+              buscaParlamentares:
+                summary: buscaParlamentares - busca por nome
+                value:
+                  query: |
+                    query {
+                      buscaParlamentares(nome: "Silva", limit: 10, offset: 0) {
+                        casa
+                        id_parlamentar
+                        nome_referencia
+                      }
+                    }
+              casas:
+                summary: casas - casas legislativas
+                value:
+                  query: |
+                    query { casas { casa nome } }
+              ufs:
+                summary: ufs - estados
+                value:
+                  query: |
+                    query { ufs { uf nome } }
+              partidos:
+                summary: partidos - siglas dos partidos
+                value:
+                  query: |
+                    query { partidos { sigla } }
+              legislaturas:
+                summary: legislaturas - todas as legislaturas
+                value:
+                  query: |
+                    query { legislaturas { numero_legislatura inicio fim } }
+              despesas:
+                summary: despesas - despesas de um parlamentar pelo id
+                value:
+                  query: |
+                    query {
+                      despesas(id: "204554", limit: 20, offset: 0, type_code: "1") {
+                        casa
+                        id_despesa
+                        id_parlamentar
+                        ano
+                        mes
+                        data_emissao
+                        codigo_tipo
+                        cnpj_cpf
+                        valor_documento
+                        valor_glosa
+                        valor_liquido
+                        tipo { codigo_tipo descricao }
+                        fornecedor { nome cnpj_cpf }
+                      }
+                    }
+              atividade:
+                summary: atividade - proposições de um parlamentar pelo id
+                value:
+                  query: |
+                    query {
+                      atividade(id: "5942", limit: 20, offset: 0) {
+                        casa
+                        id_proposicao
+                        sigla_tipo
+                        numero
+                        ano
+                        ementa
+                        data_apresentacao
+                      }
+                    }
+              votos:
+                summary: votos - votos de um parlamentar pelo id
+                value:
+                  query: |
+                    query {
+                      votos(id: "5942", limit: 100, offset: 0, vote_code: "Sim") {
+                        id_votacao
+                        id_parlamentar
+                        codigo_voto
+                        tipo { descricao }
+                        votacao { data_votacao descricao aprovacao }
+                      }
+                    }
+              todas_proposicoes:
+                summary: todas_proposicoes - todas as proposições, paginado
+                value:
+                  query: |
+                    query {
+                      todas_proposicoes(limit: 20, offset: 0) {
+                        casa
+                        id_proposicao
+                        sigla_tipo
+                        numero
+                        ano
+                        ementa
+                        data_apresentacao
+                      }
+                    }
+              todos_votos:
+                summary: todos_votos - todos os votos, paginado
+                value:
+                  query: |
+                    query {
+                      todos_votos(limit: 20, offset: 0) {
+                        casa
+                        id_votacao
+                        id_parlamentar
+                        codigo_voto
+                        tipo { descricao }
+                      }
+                    }
+      responses:
+        '200':
+          description: |
+            Resposta GraphQL. Pode conter `data`, `errors` ou ambos. Erros de
+            execução e de validação do GraphQL também retornam 200.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GraphQLResponse'
+              examples:
+                sucesso:
+                  summary: Consulta bem-sucedida
+                  value:
+                    data:
+                      parlamentar:
+                        id_parlamentar: "5942"
+                        nome_referencia: "Nome do Parlamentar"
+                        partido:
+                          sigla: "XYZ"
+                        estado:
+                          uf: "SP"
+                          nome: "São Paulo"
+                campo_invalido:
+                  summary: Erro de validação (campo inexistente)
+                  value:
+                    errors:
+                      - message: 'Invalid field requested: Cannot query field "foo" on type "Politician".'
+                        locations:
+                          - line: 1
+                            column: 20
+                erro_interno:
+                  summary: Erro interno mascarado
+                  value:
+                    data:
+                      parlamentar: null
+                    errors:
+                      - message: An internal server error occurred while processing the request
+                        path: [parlamentar]
+        '400':
+          description: |
+            Corpo JSON inválido (`Invalid request body`) ou query com profundidade
+            maior que 10 (`Query depth exceeds maximum allowed limit`).
+          content:
+            text/plain:
+              schema:
+                type: string
+              examples:
+                corpo_invalido:
+                  value: Invalid request body
+                profundidade:
+                  value: Query depth exceeds maximum allowed limit
+        '405':
+          description: Método diferente de POST.
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Method not allowed
+
+components:
+  schemas:
+    GraphQLRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          description: |
+            Texto da consulta GraphQL. `variables` e `operationName` não são lidos
+            pelo handler.
+          example: 'query { casas { casa nome } }'
+
+    GraphQLError:
+      type: object
+      properties:
+        message:
+          type: string
+        locations:
+          type: array
+          items:
+            type: object
+            properties:
+              line:
+                type: integer
+              column:
+                type: integer
+        path:
+          type: array
+          items:
+            oneOf:
+              - type: string
+              - type: integer
+
+    GraphQLResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/RootData'
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/GraphQLError'
+
+    RootData:
+      type: object
+      nullable: true
+      description: |
+        Contém apenas as consultas raiz solicitadas. Use aliases do GraphQL se
+        precisar chamar a mesma consulta mais de uma vez.
+      properties:
+        parlamentar:
+          $ref: '#/components/schemas/Politician'
+        parlamentares:
+          type: array
+          items:
+            $ref: '#/components/schemas/Politician'
+        buscaParlamentares:
+          type: array
+          items:
+            $ref: '#/components/schemas/Politician'
+        casas:
+          type: array
+          items:
+            $ref: '#/components/schemas/House'
+        ufs:
+          type: array
+          items:
+            $ref: '#/components/schemas/State'
+        partidos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Party'
+        legislaturas:
+          type: array
+          items:
+            $ref: '#/components/schemas/Legislature'
+        despesas:
+          type: array
+          items:
+            $ref: '#/components/schemas/Expense'
+        atividade:
+          type: array
+          items:
+            $ref: '#/components/schemas/Proposition'
+        votos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Vote'
+        todas_proposicoes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Proposition'
+        todos_votos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Vote'
+
+    House:
+      type: object
+      properties:
+        casa:
+          type: string
+        nome:
+          type: string
+
+    State:
+      type: object
+      properties:
+        uf:
+          type: string
+        nome:
+          type: string
+
+    Party:
+      type: object
+      properties:
+        sigla:
+          type: string
+
+    Legislature:
+      type: object
+      properties:
+        numero_legislatura:
+          type: integer
+        inicio:
+          type: string
+        fim:
+          type: string
+
+    ExpenseType:
+      type: object
+      properties:
+        casa:
+          type: string
+        codigo_tipo:
+          type: string
+        descricao:
+          type: string
+
+    Supplier:
+      type: object
+      properties:
+        casa:
+          type: string
+        cnpj_cpf:
+          type: string
+        nome:
+          type: string
+
+    Expense:
+      type: object
+      properties:
+        casa:
+          type: string
+        id_despesa:
+          type: string
+        id_parlamentar:
+          type: string
+        ano:
+          type: integer
+        mes:
+          type: integer
+        data_emissao:
+          type: string
+        codigo_tipo:
+          type: string
+        cnpj_cpf:
+          type: string
+        valor_documento:
+          type: number
+          format: double
+        valor_glosa:
+          type: number
+          format: double
+        valor_liquido:
+          type: number
+          format: double
+        tipo:
+          allOf:
+            - $ref: '#/components/schemas/ExpenseType'
+          nullable: true
+        fornecedor:
+          allOf:
+            - $ref: '#/components/schemas/Supplier'
+          nullable: true
+
+    Proposition:
+      type: object
+      properties:
+        casa:
+          type: string
+        id_proposicao:
+          type: string
+        sigla_tipo:
+          type: string
+        numero:
+          type: integer
+        ano:
+          type: integer
+        ementa:
+          type: string
+        data_apresentacao:
+          type: string
+
+    Votacao:
+      type: object
+      properties:
+        casa:
+          type: string
+        id_votacao:
+          type: string
+        data_votacao:
+          type: string
+        sigla_orgao:
+          type: string
+        aprovacao:
+          type: boolean
+        descricao:
+          type: string
+        votos_sim:
+          type: integer
+        votos_nao:
+          type: integer
+        votos_outros:
+          type: integer
+        proposicoes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Proposition'
+
+    VoteType:
+      type: object
+      properties:
+        casa:
+          type: string
+        codigo_voto:
+          type: string
+        descricao:
+          type: string
+
+    Vote:
+      type: object
+      properties:
+        casa:
+          type: string
+        id_votacao:
+          type: string
+        id_parlamentar:
+          type: string
+        codigo_voto:
+          type: string
+        votacao:
+          allOf:
+            - $ref: '#/components/schemas/Votacao'
+          nullable: true
+        tipo:
+          allOf:
+            - $ref: '#/components/schemas/VoteType'
+          nullable: true
+
+    Politician:
+      type: object
+      nullable: true
+      properties:
+        casa:
+          type: string
+        id_parlamentar:
+          type: string
+        nome_referencia:
+          type: string
+        url_foto:
+          type: string
+        email:
+          type: string
+        estado:
+          allOf:
+            - $ref: '#/components/schemas/State'
+          nullable: true
+        partido:
+          allOf:
+            - $ref: '#/components/schemas/Party'
+          nullable: true
+        legislaturas:
+          type: array
+          items:
+            $ref: '#/components/schemas/Legislature'
+        despesas:
+          type: array
+          description: 'Args: limit (padrão 20), offset (padrão 0), type_code (opcional).'
+          items:
+            $ref: '#/components/schemas/Expense'
+        atividade:
+          type: array
+          description: 'Args: limit (padrão 20), offset (padrão 0).'
+          items:
+            $ref: '#/components/schemas/Proposition'
+        votos:
+          type: array
+          description: 'Args: limit (padrão 20), offset (padrão 0), vote_code (opcional).'
+          items:
+            $ref: '#/components/schemas/Vote'
