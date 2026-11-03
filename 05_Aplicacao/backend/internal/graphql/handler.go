@@ -49,17 +49,22 @@ func (h *GraphQLHandler) HandleGraphQL(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		writeGraphQLError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if containsIntrospection(request.Query) {
+		writeGraphQLError(w, "Introspection is disabled", http.StatusBadRequest)
 		return
 	}
 
 	if !validateQueryDepth(request.Query, 10) {
-		http.Error(w, "Query depth exceeds maximum allowed limit", http.StatusBadRequest)
+		writeGraphQLError(w, "Query depth exceeds maximum allowed limit", http.StatusBadRequest)
 		return
 	}
 
 	if !validateQueryCost(request.Query) {
-		http.Error(w, "Query complexity exceeds maximum allowed limit", http.StatusBadRequest)
+		writeGraphQLError(w, "Query complexity exceeds maximum allowed limit", http.StatusBadRequest)
 		return
 	}
 

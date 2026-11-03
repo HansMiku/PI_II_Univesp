@@ -1,7 +1,9 @@
 package graphql
 
 import (
+	"encoding/json"
 	"log/slog"
+	"net/http"
 	"strings"
 
 	"github.com/graphql-go/graphql/gqlerrors"
@@ -30,4 +32,17 @@ func isClientError(msg string) bool {
 		}
 	}
 	return false
+}
+
+func writeGraphQLError(w http.ResponseWriter, message string, status int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"errors": []map[string]string{
+			{
+				"message": message,
+			},
+		},
+	})
 }

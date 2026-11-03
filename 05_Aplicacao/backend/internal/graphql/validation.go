@@ -2,6 +2,7 @@ package graphql
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/graphql-go/graphql/language/ast"
 	"github.com/graphql-go/graphql/language/parser"
@@ -60,6 +61,11 @@ func validateQueryDepth(query string, maxDepth int) bool {
 		}
 	}
 	return maxReached <= maxDepth
+}
+
+func containsIntrospection(query string) bool {
+	return strings.Contains(query, "__schema") ||
+		strings.Contains(query, "__type")
 }
 
 func (c *queryComplexity) walk(set *ast.SelectionSet, mult, depth int, root bool) {

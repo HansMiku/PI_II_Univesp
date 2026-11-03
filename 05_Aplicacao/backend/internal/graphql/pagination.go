@@ -2,12 +2,12 @@ package graphql
 
 import "github.com/graphql-go/graphql"
 
-const maxLimit = 100
+const maxLimit = 50
 
 func limitArg() *graphql.ArgumentConfig {
 	return &graphql.ArgumentConfig{
 		Type:        graphql.NewNonNull(graphql.Int),
-		Description: "Obrigatório. Máximo 100.",
+		Description: "Obrigatório. Máximo 50.",
 	}
 }
 
