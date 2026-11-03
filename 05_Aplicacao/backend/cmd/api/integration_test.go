@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	"legisanalytica/internal/activity"
-	"legisanalytica/internal/api"
 	"legisanalytica/internal/expense"
+	"legisanalytica/internal/graphql"
 	"legisanalytica/internal/politician"
 
 	"github.com/joho/godotenv"
@@ -43,7 +43,7 @@ func setupTestServer(t *testing.T) *httptest.Server {
 	aSvcRepo := activity.NewRepository(db)
 	aSvc := activity.NewService(aSvcRepo)
 
-	handler := api.NewGraphQLHandler(pSvc, eSvc, aSvc)
+	handler := graphql.NewGraphQLHandler(pSvc, eSvc, aSvc)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/graphql", handler.HandleGraphQL)

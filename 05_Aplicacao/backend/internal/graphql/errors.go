@@ -1,4 +1,4 @@
-package api
+package graphql
 
 import (
 	"log/slog"

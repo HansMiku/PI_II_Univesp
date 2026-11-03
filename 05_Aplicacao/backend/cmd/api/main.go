@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"legisanalytica/internal/activity"
-	"legisanalytica/internal/api"
 	"legisanalytica/internal/expense"
+	"legisanalytica/internal/graphql"
 	"legisanalytica/internal/politician"
 
 	"github.com/joho/godotenv"
@@ -31,7 +31,7 @@ func connectPostgres() (*gorm.DB, error) {
 	})
 }
 
-func initializeApiHandler(gormDB *gorm.DB) *api.GraphQLHandler {
+func initializeApiHandler(gormDB *gorm.DB) *graphql.GraphQLHandler {
 	pRepo := politician.NewRepository(gormDB)
 	pSvc := politician.NewService(pRepo)
 
@@ -41,7 +41,7 @@ func initializeApiHandler(gormDB *gorm.DB) *api.GraphQLHandler {
 	aSvcRepo := activity.NewRepository(gormDB)
 	aSvc := activity.NewService(aSvcRepo)
 
-	return api.NewGraphQLHandler(pSvc, dSvc, aSvc)
+	return graphql.NewGraphQLHandler(pSvc, dSvc, aSvc)
 }
 
 const SERVER_PORT = ":8080"
