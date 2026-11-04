@@ -52,10 +52,12 @@ cd backend
 go mod tidy
 ```
 
-3. Crie o .env e ajuste a senha na variável
+3. Crie o .env e ajuste `DATABASE_URL` e `CORS_ALLOWED_ORIGIN`:
 ```bash
 cp .env.example .env
 ```
+
+Defina `CORS_ALLOWED_ORIGIN` com a origem do frontend (protocolo, domínio e porta, sem caminho ou barra final), por exemplo `http://localhost:3000`. Apenas essa origem será permitida no CORS, com método `POST` e cabeçalho `Content-Type`; o preflight `OPTIONS` é tratado automaticamente. Se a variável estiver vazia, requisições com `Origin` serão bloqueadas. Requisições sem `Origin`, como chamadas de servidor e curl, continuam funcionando. Reinicie a API após alterar o `.env`.
 
 4. Execute a aplicação:
 ```bash
@@ -69,7 +71,7 @@ O servidor estará disponível em `http://localhost:8080/graphql`.
 Para executar os testes de integração, basta rodar:
 
 ```bash
-go test -v cmd/api/integration_test.go
+go test -v ./cmd/api
 ```
  
 ## 📖 Documentação da API

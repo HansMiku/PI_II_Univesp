@@ -46,7 +46,7 @@ func setupTestServer(t *testing.T) *httptest.Server {
 	handler := graphql.NewGraphQLHandler(pSvc, eSvc, aSvc)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/graphql", handler.HandleGraphQL)
+	mux.Handle("/graphql", withCORS(os.Getenv("CORS_ALLOWED_ORIGIN"), http.HandlerFunc(handler.HandleGraphQL)))
 
 	return httptest.NewServer(mux)
 }
@@ -116,6 +116,67 @@ func TestGraphQLIntegration(t *testing.T) {
 			}
 			if res == nil {
 				t.Error("Response is nil")
+			}
+		})
+	}
+}
+
+func TestCORSIntegration(t *testing.T) {
+	const allowed = "http://localhost:3000"
+	for _, tc := range []struct {
+		name, config, origin, method, requestedMethod, headers string
+		status                                                 int
+		called                                                 bool
+	}{
+		{"allowed", allowed, allowed, "POST", "", "", 200, true},
+		{"foreign origin", allowed, "https://other.example", "POST", "", "", 403, false},
+		{"origin suffix", allowed, allowed + ".evil.example", "POST", "", "", 403, false},
+		{"missing config", "", allowed, "POST", "", "", 403, false},
+		{"wildcard disabled", "*", allowed, "POST", "", "", 403, false},
+		{"without origin", "", "", "POST", "", "", 200, true},
+		{"preflight", allowed, allowed, "OPTIONS", "POST", "content-type", 204, false},
+		{"foreign preflight", allowed, "https://other.example", "OPTIONS", "POST", "Content-Type", 403, false},
+		{"invalid method", allowed, allowed, "OPTIONS", "DELETE", "", 405, false},
+		{"invalid header", allowed, allowed, "OPTIONS", "POST", "Content-Type, X-Custom", 403, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			graphqlHandler := graphql.NewGraphQLHandler(nil, nil, nil)
+			handler := withCORS(tc.config, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("X-Test-Handler-Called", "true")
+				graphqlHandler.HandleGraphQL(w, r)
+			}))
+			mux := http.NewServeMux()
+			mux.Handle("/graphql", handler)
+			server := httptest.NewServer(mux)
+			defer server.Close()
+			req, err := http.NewRequest(tc.method, server.URL+"/graphql", bytes.NewBufferString(`{"query":"{ __typename }"}`))
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Origin", tc.origin)
+			req.Header.Set("Access-Control-Request-Method", tc.requestedMethod)
+			req.Header.Set("Access-Control-Request-Headers", tc.headers)
+			res, err := server.Client().Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer res.Body.Close()
+			called := res.Header.Get("X-Test-Handler-Called") == "true"
+			if res.StatusCode != tc.status || called != tc.called {
+				t.Fatalf("status=%d, handler called=%v; want %d, %v", res.StatusCode, called, tc.status, tc.called)
+			}
+			wantOrigin := ""
+			if tc.origin == allowed && tc.config == allowed {
+				wantOrigin = allowed
+			}
+			if got := res.Header.Get("Access-Control-Allow-Origin"); got != wantOrigin {
+				t.Errorf("Allow-Origin=%q; want %q", got, wantOrigin)
+			}
+			if tc.status == http.StatusNoContent {
+				if res.Header.Get("Access-Control-Allow-Methods") != "POST" || res.Header.Get("Access-Control-Allow-Headers") != "Content-Type" {
+					t.Error("missing preflight permissions")
+				}
 			}
 		})
 	}

@@ -59,7 +59,7 @@ func main() {
 	handler := initializeApiHandler(gormDB)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/graphql", handler.HandleGraphQL)
+	mux.Handle("/graphql", withCORS(os.Getenv("CORS_ALLOWED_ORIGIN"), http.HandlerFunc(handler.HandleGraphQL)))
 
 	srv := &http.Server{
 		Addr:              SERVER_PORT,
