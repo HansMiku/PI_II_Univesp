@@ -9,6 +9,9 @@ func (b *schemaBuilder) activityQueries() graphql.Fields {
 
 		"todas_proposicoes": b.allPropositionsQueryField(),
 		"todos_votos":       b.allVotesQueryField(),
+
+		"votos_da_votacao":       b.votesByVotacaoQueryField(),
+		"votacoes_da_proposicao": b.votacoesByPropositionQueryField(),
 	}
 }
 
@@ -28,17 +31,23 @@ func (b *schemaBuilder) activityQueryField() *graphql.Field {
 				Type:         graphql.Int,
 				DefaultValue: 0,
 			},
+			"somente_votadas": {
+				Type:         graphql.Boolean,
+				DefaultValue: false,
+			},
 		},
 
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 			id := p.Args["id"].(string)
 			limit, offset := paginationArgs(p)
+			onlyVoted, _ := p.Args["somente_votadas"].(bool)
 
 			return b.as.GetPropositionsByPolitician(
 				p.Context,
 				id,
 				limit,
 				offset,
+				onlyVoted,
 			)
 		},
 	}
@@ -139,6 +148,78 @@ func (b *schemaBuilder) allVotesQueryField() *graphql.Field {
 	}
 }
 
+func (b *schemaBuilder) votesByVotacaoQueryField() *graphql.Field {
+	return &graphql.Field{
+		Type: graphql.NewList(b.voteType),
+
+		Args: graphql.FieldConfigArgument{
+			"casa": &graphql.ArgumentConfig{
+				Type: graphql.NewNonNull(graphql.String),
+			},
+			"id_votacao": &graphql.ArgumentConfig{
+				Type: graphql.NewNonNull(graphql.String),
+			},
+			"limit": {
+				Type:         graphql.Int,
+				DefaultValue: 20,
+			},
+			"offset": {
+				Type:         graphql.Int,
+				DefaultValue: 0,
+			},
+			"vote_code": {
+				Type: graphql.String,
+			},
+		},
+
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			house := p.Args["casa"].(string)
+			idVote := p.Args["id_votacao"].(string)
+			limit, offset := paginationArgs(p)
+
+			var voteCode *string
+			if val, ok := p.Args["vote_code"].(string); ok {
+				voteCode = &val
+			}
+
+			return b.as.GetVotesByVotacao(
+				p.Context,
+				house,
+				idVote,
+				limit,
+				offset,
+				voteCode,
+			)
+		},
+	}
+}
+
+func (b *schemaBuilder) votacoesByPropositionQueryField() *graphql.Field {
+	return &graphql.Field{
+		Type: graphql.NewList(b.votacaoType),
+
+		Args: graphql.FieldConfigArgument{
+			"casa": &graphql.ArgumentConfig{
+				Type: graphql.NewNonNull(graphql.String),
+			},
+			"id_proposicao": &graphql.ArgumentConfig{
+				Type: graphql.NewNonNull(graphql.String),
+			},
+		},
+
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			house := p.Args["casa"].(string)
+			idProp := p.Args["id_proposicao"].(string)
+
+			return b.as.GetVotacoesByProposition(
+				p.Context,
+				house,
+				idProp,
+			)
+		},
+	}
+}
+
 func (b *schemaBuilder) buildActivityTypes() {
 	b.propositionType = graphql.NewObject(graphql.ObjectConfig{
 		Name: "Proposition",
@@ -150,6 +231,7 @@ func (b *schemaBuilder) buildActivityTypes() {
 			"ano":               &graphql.Field{Type: graphql.Int},
 			"ementa":            &graphql.Field{Type: graphql.String},
 			"data_apresentacao": &graphql.Field{Type: graphql.String},
+			"tem_votacao":       &graphql.Field{Type: graphql.Boolean},
 		},
 	})
 

@@ -311,6 +311,7 @@ CREATE TABLE public.autoria (
     partido          TEXT,
     uf               VARCHAR(2),
     ordem_assinatura INTEGER,
+    principal        BOOLEAN      NOT NULL DEFAULT false,
     id_lote          TEXT  NOT NULL,
     CONSTRAINT pk_autoria PRIMARY KEY (casa, id_proposicao, id_autor),
     CONSTRAINT fk_autoria_casa FOREIGN KEY (casa)

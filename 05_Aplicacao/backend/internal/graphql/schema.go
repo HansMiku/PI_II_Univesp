@@ -18,9 +18,11 @@ type schemaBuilder struct {
 	partyType       *graphql.Object
 	legislatureType *graphql.Object
 
-	expenseKindType *graphql.Object
-	supplierType    *graphql.Object
-	expenseType     *graphql.Object
+	expenseKindType    *graphql.Object
+	supplierType       *graphql.Object
+	expenseType        *graphql.Object
+	expenseSummaryType *graphql.Object
+	expenseStatsType   *graphql.Object
 
 	propositionType *graphql.Object
 	votacaoType     *graphql.Object

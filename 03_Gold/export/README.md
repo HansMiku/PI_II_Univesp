@@ -18,7 +18,8 @@ Notebook de transferência de `workspace.pi_ii_gold` para o PostgreSQL Supabase.
 - **01/01/2025 a 31/12/2025** (um ano-calendário completo).
 - Despesas e total publicado por `ano=2025`; votações por `data_votacao`.
 - Proposições apresentadas em 2025 **mais** proposições anteriores referenciadas por votações de 2025, necessárias para preservar FKs. Algumas proposições podem ter `data_apresentacao` anterior a 2025: não classificá-las como novas proposições do ano.
-- `autoria`, `status_atual` e `votacao_proposicao` seguem as entidades selecionadas; `valor_despesa` segue as despesas e `voto` segue as votações.
+- Votações de 2025 **mais** votações vinculadas a qualquer proposição exportada. Isso preserva a situação de propostas antigas que foram votadas e recupera os vínculos de votação do Senado existentes no Gold.
+- `autoria`, `status_atual` e `votacao_proposicao` seguem as entidades selecionadas; `valor_despesa` segue as despesas e `voto` segue as votações exportadas.
 - Catálogos e relacionamentos cadastrais permanecem completos quando necessários.
 - Votações sem `data_votacao` não entram no recorte por falta de data para classificação.
 

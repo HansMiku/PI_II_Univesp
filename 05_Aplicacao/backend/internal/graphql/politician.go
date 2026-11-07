@@ -148,7 +148,7 @@ func (b *schemaBuilder) buildPoliticianType() {
 					if val, ok := p.Args["type_code"].(string); ok {
 						typeCode = &val
 					}
-					return b.ds.GetExpensesByPolitician(p.Context, pol.IDPolitician, limit, offset, typeCode)
+					return b.ds.GetExpensesByPolitician(p.Context, pol.IDPolitician, &pol.House, limit, offset, typeCode)
 				},
 			},
 
@@ -164,7 +164,7 @@ func (b *schemaBuilder) buildPoliticianType() {
 						return nil, nil
 					}
 					limit, offset := paginationArgs(p)
-					return b.as.GetPropositionsByPolitician(p.Context, pol.IDPolitician, limit, offset)
+					return b.as.GetPropositionsByPolitician(p.Context, pol.IDPolitician, limit, offset, false)
 				},
 			},
 

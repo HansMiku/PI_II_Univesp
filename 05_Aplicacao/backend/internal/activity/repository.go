@@ -6,8 +6,9 @@ import (
 
 	"gorm.io/gorm"
 )
+
 type Repository interface {
-	GetPropositionsByPolitician(ctx context.Context, id string, limit, offset int) ([]Proposition, error)
+	GetPropositionsByPolitician(ctx context.Context, id string, limit, offset int, onlyVoted bool) ([]Proposition, error)
 	GetVotesByPolitician(ctx context.Context, id string, limit, offset int, voteCode *string) ([]Vote, error)
 	ListAllPropositions(ctx context.Context, limit, offset int) ([]Proposition, error)
 	ListAllVotes(ctx context.Context, limit, offset int) ([]Vote, error)
@@ -15,6 +16,8 @@ type Repository interface {
 	GetVotacao(ctx context.Context, house, idVote string) (*Votacao, error)
 	GetPropositionsByVote(ctx context.Context, house, idVote string) ([]Proposition, error)
 	GetVotesByProposition(ctx context.Context, house, idProp string) ([]Vote, error)
+	GetVotacoesByProposition(ctx context.Context, house, idProp string) ([]Votacao, error)
+	GetVotesByVotacao(ctx context.Context, house, idVote string, limit, offset int, voteCode *string) ([]Vote, error)
 }
 
 type repository struct {
@@ -25,13 +28,28 @@ func NewRepository(db *gorm.DB) Repository {
 	return &repository{db: db}
 }
 
-func (r *repository) GetPropositionsByPolitician(ctx context.Context, id string, limit, offset int) ([]Proposition, error) {
+const propositionVoteExistsSQL = `EXISTS (
+	SELECT 1 FROM public.votacao_proposicao vp
+	WHERE vp.casa = public.proposicao.casa
+	  AND vp.id_proposicao = public.proposicao.id_proposicao
+)`
+
+func (r *repository) GetPropositionsByPolitician(ctx context.Context, id string, limit, offset int, onlyVoted bool) ([]Proposition, error) {
 	var propositions []Proposition
-	err := r.db.WithContext(ctx).
+	query := r.db.WithContext(ctx).
 		Table("public.proposicao").
-		Joins("JOIN public.autoria ON public.proposicao.id_proposicao = public.autoria.id_proposicao").
-		Where("public.autoria.id_autor = ?", id).
-		Limit(limit).Offset(offset).
+		Select("public.proposicao.*, "+propositionVoteExistsSQL+" AS tem_votacao").
+		Joins("JOIN public.autoria ON public.proposicao.id_proposicao = public.autoria.id_proposicao AND public.proposicao.casa = public.autoria.casa").
+		Where("public.autoria.id_autor = ? AND public.autoria.principal = ?", id, true)
+
+	if onlyVoted {
+		query = query.Where(propositionVoteExistsSQL)
+	}
+
+	err := query.
+		Order("public.proposicao.data_apresentacao DESC NULLS LAST, public.proposicao.id_proposicao DESC").
+		Limit(limit).
+		Offset(offset).
 		Find(&propositions).Error
 
 	if err != nil {
@@ -57,7 +75,12 @@ func (r *repository) GetVotesByPolitician(ctx context.Context, id string, limit,
 
 func (r *repository) ListAllPropositions(ctx context.Context, limit, offset int) ([]Proposition, error) {
 	var propositions []Proposition
-	err := r.db.WithContext(ctx).Limit(limit).Offset(offset).Find(&propositions).Error
+	err := r.db.WithContext(ctx).
+		Table("public.proposicao").
+		Select("public.proposicao.*, " + propositionVoteExistsSQL + " AS tem_votacao").
+		Limit(limit).
+		Offset(offset).
+		Find(&propositions).Error
 	if err != nil {
 		return nil, fmt.Errorf("error listing all propositions: %w", err)
 	}
@@ -95,7 +118,8 @@ func (r *repository) GetPropositionsByVote(ctx context.Context, house, idVote st
 	var propositions []Proposition
 	err := r.db.WithContext(ctx).
 		Table("public.proposicao").
-		Joins("JOIN public.votacao_proposicao ON public.proposicao.id_proposicao = public.votacao_proposicao.id_proposicao").
+		Select("public.proposicao.*, "+propositionVoteExistsSQL+" AS tem_votacao").
+		Joins("JOIN public.votacao_proposicao ON public.proposicao.id_proposicao = public.votacao_proposicao.id_proposicao AND public.proposicao.casa = public.votacao_proposicao.casa").
 		Where("public.votacao_proposicao.casa = ? AND public.votacao_proposicao.id_votacao = ?", house, idVote).
 		Find(&propositions).Error
 	if err != nil {
@@ -108,8 +132,9 @@ func (r *repository) GetVotesByProposition(ctx context.Context, house, idProp st
 	var votes []Vote
 	err := r.db.WithContext(ctx).
 		Table("public.voto").
-		Joins("JOIN public.votacao ON public.voto.id_votacao = public.votacao.id_votacao").
-		Joins("JOIN public.votacao_proposicao ON public.votacao.id_votacao = public.votacao_proposicao.id_votacao").
+		Select("public.voto.*").
+		Joins("JOIN public.votacao ON public.voto.id_votacao = public.votacao.id_votacao AND public.voto.casa = public.votacao.casa").
+		Joins("JOIN public.votacao_proposicao ON public.votacao.id_votacao = public.votacao_proposicao.id_votacao AND public.votacao.casa = public.votacao_proposicao.casa").
 		Where("public.votacao.casa = ? AND public.votacao_proposicao.id_proposicao = ?", house, idProp).
 		Find(&votes).Error
 	if err != nil {
@@ -122,11 +147,29 @@ func (r *repository) GetVotacoesByProposition(ctx context.Context, house, idProp
 	var votacoes []Votacao
 	err := r.db.WithContext(ctx).
 		Table("public.votacao").
-		Joins("JOIN public.votacao_proposicao ON public.votacao.id_votacao = public.votacao_proposicao.id_votacao").
+		Select("public.votacao.*").
+		Joins("JOIN public.votacao_proposicao ON public.votacao.id_votacao = public.votacao_proposicao.id_votacao AND public.votacao.casa = public.votacao_proposicao.casa").
 		Where("public.votacao_proposicao.casa = ? AND public.votacao_proposicao.id_proposicao = ?", house, idProp).
+		Order("public.votacao.data_votacao DESC").
 		Find(&votacoes).Error
 	if err != nil {
 		return nil, fmt.Errorf("error fetching votacoes by proposition: %w", err)
 	}
 	return votacoes, nil
+}
+
+func (r *repository) GetVotesByVotacao(ctx context.Context, house, idVote string, limit, offset int, voteCode *string) ([]Vote, error) {
+	var votes []Vote
+	query := r.db.WithContext(ctx).
+		Where("casa = ? AND id_votacao = ?", house, idVote)
+
+	if voteCode != nil {
+		query = query.Where("codigo_voto = ?", *voteCode)
+	}
+
+	err := query.Order("id_parlamentar").Limit(limit).Offset(offset).Find(&votes).Error
+	if err != nil {
+		return nil, fmt.Errorf("error fetching votes by votacao: %w", err)
+	}
+	return votes, nil
 }

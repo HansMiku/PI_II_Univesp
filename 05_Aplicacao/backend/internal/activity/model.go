@@ -3,13 +3,14 @@ package activity
 import "time"
 
 type Proposition struct {
-	House             string    `gorm:"column:casa" json:"casa"`
-	IDProposition     string    `gorm:"column:id_proposicao;primaryKey" json:"id_proposicao"`
-	TypeAcronym       string    `gorm:"column:sigla_tipo" json:"sigla_tipo"`
-	Number           int       `gorm:"column:numero" json:"numero"`
-	Year              int       `gorm:"column:ano" json:"ano"`
-	Summary           string    `gorm:"column:ementa" json:"ementa"`
+	House            string    `gorm:"column:casa" json:"casa"`
+	IDProposition    string    `gorm:"column:id_proposicao;primaryKey" json:"id_proposicao"`
+	TypeAcronym      string    `gorm:"column:sigla_tipo" json:"sigla_tipo"`
+	Number           *int      `gorm:"column:numero" json:"numero"`
+	Year             *int      `gorm:"column:ano" json:"ano"`
+	Summary          string    `gorm:"column:ementa" json:"ementa"`
 	PresentationDate time.Time `gorm:"column:data_apresentacao" json:"data_apresentacao"`
+	HasVote          bool      `gorm:"column:tem_votacao" json:"tem_votacao"`
 }
 
 func (Proposition) TableName() string {
@@ -17,10 +18,10 @@ func (Proposition) TableName() string {
 }
 
 type Vote struct {
-	House          string `gorm:"column:casa" json:"casa"`
-	IDVote         string `gorm:"column:id_votacao;primaryKey" json:"id_votacao"`
-	IDPolitician   string `gorm:"column:id_parlamentar" json:"id_parlamentar"`
-	VoteCode       string `gorm:"column:codigo_voto" json:"codigo_voto"`
+	House        string `gorm:"column:casa" json:"casa"`
+	IDVote       string `gorm:"column:id_votacao;primaryKey" json:"id_votacao"`
+	IDPolitician string `gorm:"column:id_parlamentar" json:"id_parlamentar"`
+	VoteCode     string `gorm:"column:codigo_voto" json:"codigo_voto"`
 }
 
 func (Vote) TableName() string {

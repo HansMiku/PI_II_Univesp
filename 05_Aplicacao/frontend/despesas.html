@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Despesas - LegisData</title>
+    <link rel="stylesheet" href="style.css">
+
+    <style>
+        .dashboard-container {
+            display: block;
+            max-width: 1100px;
+        }
+
+        .bloco {
+            margin-bottom: 25px;
+        }
+
+        .aviso {
+            background: var(--cor-aviso-fundo);
+            border-left: 4px solid var(--cor-aviso-borda);
+            padding: 12px 15px;
+            border-radius: 6px;
+            margin-bottom: 25px;
+            font-size: 14px;
+        }
+
+        .caixa-busca {
+            position: relative;
+        }
+
+        .caixa-busca input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid var(--cor-borda);
+            border-radius: 6px;
+            font-size: 15px;
+        }
+
+        .lista-suspensa {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 100%;
+            z-index: 20;
+            background: var(--cor-superficie);
+            border: 1px solid var(--cor-borda);
+            border-radius: 6px;
+            max-height: 300px;
+            overflow-y: auto;
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+
+        .lista-suspensa.aberta {
+            display: block;
+        }
+
+        .opcao {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--cor-borda);
+        }
+
+        .opcao:hover {
+            background: var(--cor-fundo-hover);
+        }
+
+        .opcao span {
+            font-size: 12px;
+            color: var(--cor-texto-secundario);
+            margin-left: 6px;
+        }
+
+        .mensagem-lista {
+            padding: 10px 15px;
+            color: var(--cor-texto-secundario);
+            font-size: 14px;
+        }
+
+        .resumo-despesas {
+            margin-bottom: 20px;
+            color: var(--cor-texto-secundario);
+            font-size: 14px;
+        }
+
+        .filtros-despesas {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .filtros-despesas label {
+            color: var(--cor-marinho);
+        }
+
+        .filtros-despesas select {
+            padding: 8px 10px;
+            border: 1px solid var(--cor-borda);
+            border-radius: 6px;
+            font-size: 14px;
+            background: var(--cor-superficie);
+        }
+
+        .grafico-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            height: 400px;
+            margin: 0 auto;
+        }
+
+        .lista-categorias {
+            margin-top: 25px;
+        }
+
+        .item-categoria {
+            display: flex;
+            justify-content: space-between;
+            gap: 15px;
+            padding: 12px 15px;
+            margin-bottom: 8px;
+            background: var(--cor-fundo-suave);
+            border-left: 4px solid var(--cor-ciano);
+            border-radius: 6px;
+        }
+
+        .item-categoria strong {
+            color: var(--cor-marinho);
+        }
+
+        .item-categoria span {
+            color: var(--cor-verde);
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        @media (max-width: 600px) {
+            .grafico-container {
+                height: 320px;
+            }
+
+            .item-categoria {
+                flex-direction: column;
+                gap: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar">
+        <a href="index.html" class="navbar-brand">LegisData</a>
+        <ul class="nav-links">
+            <li><a href="index.html">Sobre o Projeto</a></li>
+            <li><a href="despesas.html" class="ativo">Painel de Despesas</a></li>
+            <li><a href="propostas.html">Painel de Propostas</a></li>
+        </ul>
+    </nav>
+
+    <header class="hero-section hero-pagina">
+        <div class="hero-conteudo">
+            <div class="hero-pagina-texto">
+                <span class="hero-selo">Painel de Despesas</span>
+                <h1>Despesas por parlamentar</h1>
+                <p class="hero-descricao">
+                    Selecione um parlamentar para consultar as despesas por categoria.
+                </p>
+            </div>
+            <div id="status-api" class="status-pill">Aguardando</div>
+            <p class="hero-nota">
+                <strong>Atenção:</strong> os dados podem conter erros ou lacunas e não são 100% fiéis.
+                Confira sempre nas fontes oficiais.
+            </p>
+        </div>
+    </header>
+
+    <main class="dashboard-container">
+
+        <section class="card bloco">
+            <h2>1. Escolha o parlamentar</h2>
+            <p class="subtitulo">
+                Clique no campo para ver a lista ou digite parte do nome para filtrar
+            </p>
+
+            <div class="caixa-busca">
+                <input
+                    type="text"
+                    id="campo-busca"
+                    placeholder="Clique ou digite o nome do parlamentar"
+                    autocomplete="off"
+                >
+                <div id="lista-suspensa" class="lista-suspensa"></div>
+            </div>
+        </section>
+
+        <section class="card bloco" id="area-despesas" hidden>
+            <h2 id="titulo-despesas">2. Despesas por categoria</h2>
+            <p id="sub-despesas" class="subtitulo"></p>
+
+            <div class="filtros-despesas">
+                <label for="mes-inicio">De</label>
+                <select id="mes-inicio"></select>
+
+                <label for="mes-fim">Até</label>
+                <select id="mes-fim"></select>
+
+                <label for="modo-valor">Gráfico</label>
+                <select id="modo-valor">
+                    <option value="total">Total do período</option>
+                    <option value="media">Média mensal</option>
+                </select>
+            </div>
+
+            <div id="mensagem-despesas" class="resumo-despesas"></div>
+
+            <div id="grafico-container" class="grafico-container">
+                <canvas id="grafico-categorias"></canvas>
+            </div>
+
+            <div id="lista-categorias" class="lista-categorias"></div>
+        </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="despesas.js"></script>
+</body>
+</html>

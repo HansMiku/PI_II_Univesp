@@ -120,7 +120,7 @@ const data = await gql(`
 | `partidos` | - | `[Party]` |
 | `legislaturas` | - | `[Legislature]` |
 | `despesas` | `id`!, `limit`=20, `offset`=0, `type_code` | `[Expense]` |
-| `atividade` | `id`!, `limit`=20, `offset`=0 | `[Proposition]` |
+| `atividade` | `id`!, `limit`=20, `offset`=0, `somente_votadas`=false | `[Proposition]` |
 | `votos` | `id`!, `limit`=20, `offset`=0, `vote_code` | `[Vote]` |
 | `todas_proposicoes` | `limit`=20, `offset`=0 | `[Proposition]` |
 | `todos_votos` | `limit`=20, `offset`=0 | `[Vote]` |
@@ -306,6 +306,10 @@ query {
 ```
 
 ### 7. Proposições de um parlamentar
+
+> `atividade` retorna apenas proposições em que o parlamentar é o **autor principal**. Apoios e co-autorias não aparecem como autoria.
+>
+> Use `somente_votadas: true` para retornar apenas proposições com votação registrada. O campo `tem_votacao` indica se a proposta possui votação vinculada.
 
 ```graphql
 query {

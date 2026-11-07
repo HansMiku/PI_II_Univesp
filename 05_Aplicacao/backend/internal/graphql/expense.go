@@ -2,6 +2,34 @@ package graphql
 
 import "github.com/graphql-go/graphql"
 
+func expenseQueryArgs(p graphql.ResolveParams) (string, *string, *string, *int, *int) {
+	id := p.Args["id"].(string)
+
+	var typeCode *string
+	if val, ok := p.Args["type_code"].(string); ok {
+		typeCode = &val
+	}
+
+	var house *string
+	if val, ok := p.Args["casa"].(string); ok && val != "" {
+		house = &val
+	}
+
+	var monthStart, monthEnd *int
+	if val, ok := p.Args["mes_inicio"].(int); ok {
+		monthStart = &val
+	}
+	if val, ok := p.Args["mes_fim"].(int); ok {
+		monthEnd = &val
+	}
+
+	if monthStart != nil && monthEnd != nil && *monthStart > *monthEnd {
+		*monthStart, *monthEnd = *monthEnd, *monthStart
+	}
+
+	return id, house, typeCode, monthStart, monthEnd
+}
+
 func (b *schemaBuilder) expenseQueries() graphql.Fields {
 	return graphql.Fields{
 		"despesas": &graphql.Field{
@@ -22,6 +50,9 @@ func (b *schemaBuilder) expenseQueries() graphql.Fields {
 				"type_code": {
 					Type: graphql.String,
 				},
+				"casa": {
+					Type: graphql.String,
+				},
 			},
 
 			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
@@ -34,12 +65,127 @@ func (b *schemaBuilder) expenseQueries() graphql.Fields {
 					typeCode = &val
 				}
 
+				var house *string
+				if val, ok := p.Args["casa"].(string); ok && val != "" {
+					house = &val
+				}
+
 				return b.ds.GetExpensesByPolitician(
 					p.Context,
 					id,
+					house,
 					limit,
 					offset,
 					typeCode,
+				)
+			},
+		},
+		"totalDespesas": &graphql.Field{
+			Type: graphql.NewNonNull(graphql.Int),
+
+			Args: graphql.FieldConfigArgument{
+				"id": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+				"type_code": {
+					Type: graphql.String,
+				},
+				"casa": {
+					Type: graphql.String,
+				},
+			},
+
+			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				id := p.Args["id"].(string)
+
+				var typeCode *string
+				if val, ok := p.Args["type_code"].(string); ok {
+					typeCode = &val
+				}
+
+				var house *string
+				if val, ok := p.Args["casa"].(string); ok && val != "" {
+					house = &val
+				}
+
+				total, err := b.ds.CountExpensesByPolitician(
+					p.Context,
+					id,
+					house,
+					typeCode,
+				)
+				if err != nil {
+					return nil, err
+				}
+
+				return int(total), nil
+			},
+		},
+		"resumoDespesas": &graphql.Field{
+			Type: graphql.NewList(b.expenseSummaryType),
+
+			Args: graphql.FieldConfigArgument{
+				"id": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+				"type_code": {
+					Type: graphql.String,
+				},
+				"casa": {
+					Type: graphql.String,
+				},
+				"mes_inicio": {
+					Type: graphql.Int,
+				},
+				"mes_fim": {
+					Type: graphql.Int,
+				},
+			},
+
+			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				id, house, typeCode, monthStart, monthEnd := expenseQueryArgs(p)
+
+				return b.ds.GetExpenseSummaryByPolitician(
+					p.Context,
+					id,
+					house,
+					typeCode,
+					monthStart,
+					monthEnd,
+				)
+			},
+		},
+		"estatisticasDespesas": &graphql.Field{
+			Type: b.expenseStatsType,
+
+			Args: graphql.FieldConfigArgument{
+				"id": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+				"type_code": {
+					Type: graphql.String,
+				},
+				"casa": {
+					Type: graphql.String,
+				},
+				"mes_inicio": {
+					Type: graphql.Int,
+				},
+				"mes_fim": {
+					Type: graphql.Int,
+				},
+			},
+
+			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				id, house, typeCode, monthStart, monthEnd := expenseQueryArgs(p)
+
+				return b.ds.GetExpenseStatisticsByPolitician(
+					p.Context,
+					id,
+					house,
+					typeCode,
+					monthStart,
+					monthEnd,
 				)
 			},
 		},
@@ -61,6 +207,27 @@ func (b *schemaBuilder) buildExpenseTypes() {
 			"casa":     &graphql.Field{Type: graphql.String},
 			"cnpj_cpf": &graphql.Field{Type: graphql.String},
 			"nome":     &graphql.Field{Type: graphql.String},
+		},
+	})
+
+	b.expenseSummaryType = graphql.NewObject(graphql.ObjectConfig{
+		Name: "ExpenseCategorySummary",
+		Fields: graphql.Fields{
+			"categoria":  &graphql.Field{Type: graphql.String},
+			"quantidade": &graphql.Field{Type: graphql.Int},
+			"total":      &graphql.Field{Type: graphql.Float},
+		},
+	})
+
+	b.expenseStatsType = graphql.NewObject(graphql.ObjectConfig{
+		Name: "ExpenseStatistics",
+		Fields: graphql.Fields{
+			"total_despesas":     &graphql.Field{Type: graphql.Int},
+			"total_liquido":      &graphql.Field{Type: graphql.Float},
+			"meses_com_despesas": &graphql.Field{Type: graphql.Int},
+			"ano_inicio":         &graphql.Field{Type: graphql.Int},
+			"ano_fim":            &graphql.Field{Type: graphql.Int},
+			"media_mensal":       &graphql.Field{Type: graphql.Float},
 		},
 	})
 

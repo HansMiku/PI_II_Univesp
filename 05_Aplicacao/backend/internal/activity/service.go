@@ -3,7 +3,7 @@ package activity
 import "context"
 
 type Service interface {
-	GetPropositionsByPolitician(ctx context.Context, id string, limit, offset int) ([]Proposition, error)
+	GetPropositionsByPolitician(ctx context.Context, id string, limit, offset int, onlyVoted bool) ([]Proposition, error)
 	GetVotesByPolitician(ctx context.Context, id string, limit, offset int, voteCode *string) ([]Vote, error)
 	ListAllPropositions(ctx context.Context, limit, offset int) ([]Proposition, error)
 	ListAllVotes(ctx context.Context, limit, offset int) ([]Vote, error)
@@ -11,6 +11,8 @@ type Service interface {
 	GetVotacao(ctx context.Context, house, idVote string) (*Votacao, error)
 	GetPropositionsByVote(ctx context.Context, house, idVote string) ([]Proposition, error)
 	GetVotesByProposition(ctx context.Context, house, idProp string) ([]Vote, error)
+	GetVotacoesByProposition(ctx context.Context, house, idProp string) ([]Votacao, error)
+	GetVotesByVotacao(ctx context.Context, house, idVote string, limit, offset int, voteCode *string) ([]Vote, error)
 }
 
 type service struct {
@@ -21,8 +23,8 @@ func NewService(repo Repository) Service {
 	return &service{repo: repo}
 }
 
-func (s *service) GetPropositionsByPolitician(ctx context.Context, id string, limit, offset int) ([]Proposition, error) {
-	return s.repo.GetPropositionsByPolitician(ctx, id, limit, offset)
+func (s *service) GetPropositionsByPolitician(ctx context.Context, id string, limit, offset int, onlyVoted bool) ([]Proposition, error) {
+	return s.repo.GetPropositionsByPolitician(ctx, id, limit, offset, onlyVoted)
 }
 
 func (s *service) GetVotesByPolitician(ctx context.Context, id string, limit, offset int, voteCode *string) ([]Vote, error) {
@@ -51,4 +53,12 @@ func (s *service) GetPropositionsByVote(ctx context.Context, house, idVote strin
 
 func (s *service) GetVotesByProposition(ctx context.Context, house, idProp string) ([]Vote, error) {
 	return s.repo.GetVotesByProposition(ctx, house, idProp)
+}
+
+func (s *service) GetVotacoesByProposition(ctx context.Context, house, idProp string) ([]Votacao, error) {
+	return s.repo.GetVotacoesByProposition(ctx, house, idProp)
+}
+
+func (s *service) GetVotesByVotacao(ctx context.Context, house, idVote string, limit, offset int, voteCode *string) ([]Vote, error) {
+	return s.repo.GetVotesByVotacao(ctx, house, idVote, limit, offset, voteCode)
 }

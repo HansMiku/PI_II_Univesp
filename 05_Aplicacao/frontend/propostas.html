@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Propostas por Parlamentar - LegisData</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .dashboard-container { display: block; }
+        .bloco { margin-bottom: 25px; }
+        .aviso { background: var(--cor-aviso-fundo); border-left: 4px solid var(--cor-aviso-borda); color: var(--cor-aviso-texto); padding: 12px 15px; border-radius: 6px; margin-bottom: 25px; font-size: 14px; }
+        .caixa-busca { position: relative; }
+        .caixa-busca input { width: 100%; padding: 12px 15px; border: 1px solid var(--cor-borda); border-radius: 6px; font-size: 15px; }
+        .lista-suspensa { position: absolute; left: 0; right: 0; top: 100%; z-index: 20; background: var(--cor-superficie); border: 1px solid var(--cor-borda); border-radius: 6px; max-height: 300px; overflow-y: auto; box-shadow: 0 6px 15px rgba(11, 37, 69, 0.1); display: none; }
+        .lista-suspensa.aberta { display: block; }
+        .opcao { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid var(--cor-borda); }
+        .opcao:hover { background: var(--cor-fundo-hover); }
+        .opcao span { font-size: 12px; color: var(--cor-texto-secundario); margin-left: 6px; }
+        .carregando { padding: 10px 15px; color: var(--cor-texto-secundario); font-size: 14px; }
+        .descricao { display: block; margin: 4px 0; }
+
+        .filtro-votadas { display: flex; align-items: center; gap: 8px; margin-top: 12px; color: var(--cor-texto-secundario); font-size: 14px; cursor: pointer; }
+        .filtro-votadas input { accent-color: var(--cor-verde); }
+        .badge-votada { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: rgba(0, 180, 216, 0.14); color: var(--cor-ciano-escuro); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; vertical-align: middle; }
+
+        .item-ranking { cursor: pointer; }
+        .modal-fundo { position: fixed; inset: 0; background: rgba(11, 37, 69, 0.55); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+        .modal-fundo.aberto { display: flex; }
+        .modal-caixa { background: var(--cor-superficie); border-radius: 10px; max-width: 700px; width: 100%; max-height: 85vh; overflow-y: auto; padding: 25px; position: relative; }
+        .modal-fechar { position: absolute; top: 12px; right: 15px; background: none; color: var(--cor-texto-secundario); font-size: 22px; padding: 0 8px; }
+        .modal-fechar:hover { background: none; color: var(--cor-marinho); }
+        .modal-caixa h3 { color: var(--cor-marinho); margin-bottom: 10px; padding-right: 30px; }
+        .modal-caixa h4 { color: var(--cor-marinho-claro); margin: 18px 0 8px; }
+        .modal-info { font-size: 13px; color: var(--cor-texto-secundario); margin-bottom: 10px; }
+        .modal-texto { line-height: 1.5; font-size: 14px; }
+        .modal-texto-secundario { font-size: 13px; color: var(--cor-texto-secundario); }
+        .modal-situacao { margin-bottom: 10px; }
+        .lista-votacoes { display: flex; flex-direction: column; gap: 10px; }
+        .votacao-item { padding: 10px 12px; border: 1px solid var(--cor-borda); border-left: 4px solid var(--cor-ciano); border-radius: 6px; background: var(--cor-fundo-suave); }
+        .votacao-aprovada { border-left-color: var(--cor-verde); }
+        .votacao-rejeitada { border-left-color: #c0392b; }
+        .status-votacao { display: inline-block; margin-bottom: 5px; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+        .status-aprovada { background: rgba(22, 138, 91, 0.12); color: var(--cor-verde); }
+        .status-rejeitada { background: rgba(192, 57, 43, 0.1); color: #c0392b; }
+        .status-neutro { background: rgba(75, 85, 99, 0.1); color: var(--cor-texto-secundario); }
+        .votacao-meta { font-size: 12px; color: var(--cor-texto-secundario); }
+        .votacao-descricao { font-size: 13px; line-height: 1.45; margin: 6px 0; color: var(--cor-texto); }
+        .votacao-votos { font-size: 12px; color: var(--cor-texto-secundario); }
+        .modal-aviso { margin-top: 18px; padding: 10px 12px; background: var(--cor-aviso-fundo); border-left: 4px solid var(--cor-aviso-borda); border-radius: 6px; font-size: 12px; color: var(--cor-aviso-texto); }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar">
+        <a href="index.html" class="navbar-brand">LegisData</a>
+        <ul class="nav-links">
+            <li><a href="index.html">Sobre o Projeto</a></li>
+            <li><a href="despesas.html">Painel de Despesas</a></li>
+            <li><a href="propostas.html" class="ativo">Painel de Propostas</a></li>
+        </ul>
+    </nav>
+
+    <header class="hero-section hero-pagina">
+        <div class="hero-conteudo">
+            <div class="hero-pagina-texto">
+                <span class="hero-selo">Painel de Propostas</span>
+                <h1>Propostas por Parlamentar</h1>
+                <p class="hero-descricao">
+                    Selecione um parlamentar e veja as propostas de autoria dele.
+                </p>
+            </div>
+            <div id="status-api" class="status-pill">Aguardando</div>
+            <p class="hero-nota">
+                <strong>Atenção:</strong> os dados podem conter erros ou lacunas e não são 100% fiéis.
+                Confira sempre nas fontes oficiais (Câmara dos Deputados e Senado Federal).
+            </p>
+        </div>
+    </header>
+
+    <main class="dashboard-container">
+
+        <section class="card bloco">
+            <h2>1. Escolha o parlamentar</h2>
+            <p class="subtitulo">Clique no campo para ver a lista ou digite parte do nome para filtrar</p>
+            <div class="caixa-busca">
+                <input type="text" id="campo-busca" placeholder="Clique ou digite o nome do parlamentar" autocomplete="off">
+                <div id="lista-suspensa" class="lista-suspensa"></div>
+            </div>
+            <label class="filtro-votadas">
+                <input type="checkbox" id="filtro-votadas">
+                Mostrar somente propostas com votação registrada
+            </label>
+        </section>
+
+        <section class="card bloco" id="area-propostas" hidden>
+            <h2 id="titulo-propostas">2. Propostas</h2>
+            <p class="subtitulo" id="sub-propostas"></p>
+            <div id="lista-propostas" class="lista-ranking"></div>
+            <div style="margin-top:15px;">
+                <button id="btn-mais" hidden>Carregar mais</button>
+            </div>
+        </section>
+    </main>
+
+    <div id="modal-proposta" class="modal-fundo">
+        <div class="modal-caixa">
+            <button class="modal-fechar" id="modal-fechar" aria-label="Fechar">&times;</button>
+            <h3 id="modal-titulo"></h3>
+            <div id="modal-corpo"></div>
+        </div>
+    </div>
+
+    <script src="propostas.js"></script>
+</body>
+</html>
